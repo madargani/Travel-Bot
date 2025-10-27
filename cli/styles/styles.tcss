@@ -1,0 +1,10 @@
+.column {
+  width: 1fr;
+  height: 100%;
+}
+
+.message {
+  height: auto;
+  padding: 1;
+  margin: 1;
+}
