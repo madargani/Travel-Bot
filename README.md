@@ -7,3 +7,8 @@ Your personal travel planner. This conversational agent will plan everything abo
 
 ## Usage
 `python cli/app.py`
+
+## Group Members
+- Andre Dargani, mdargani@sfsu.edu, 922480985
+- Michael McGruder, mmcgruder@sfsu.edu, 922970422
+- Katherine Chien, kchien@sfsu.edu, 923988517
