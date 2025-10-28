@@ -2,6 +2,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Static, Input, Markdown, Placeholder
 from textual.widget import Widget
 from textual.containers import Horizontal, VerticalScroll
+from textual import on
 
 from pathlib import Path
 
@@ -9,10 +10,14 @@ EXAMPLE_MARKDOWN = Path('cli/example_trip.md').read_text()
 
 class ChatInterface(Widget):
   def compose(self) -> ComposeResult:
-    with VerticalScroll():
-      for i in range(10):
-        yield Placeholder(classes='message')
+    yield VerticalScroll(id = 'message_container')
     yield Input(placeholder="Tell me about your dream trip")
+
+  @on(Input.Submitted)
+  def send_message(self, event: Input.Submitted) -> None:
+      message_container = self.query_one('#message_container')
+      event.input.clear()
+      message_container.mount(Placeholder(event.value, classes='message'))
 
 class TravelBot(App):
   CSS_PATH = "styles/styles.tcss"
