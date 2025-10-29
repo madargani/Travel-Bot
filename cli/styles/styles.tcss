@@ -6,5 +6,15 @@
 .message {
   height: auto;
   padding: 1;
-  margin: 1;
+  text-align: left;
+}
+
+.user {
+  margin: 1 1 1 10;
+  background: darkblue;
+}
+
+.agent {
+  margin: 1 10 1 1;
+  background: darkblue;
 }
