@@ -9,7 +9,7 @@ from helpers.mock_stream import mock_stream
 class ChatInterface(Widget):
   def compose(self) -> ComposeResult:
     yield VerticalScroll(id = 'message_container')
-    yield Input(placeholder="Tell me about your dream trip")
+    yield Input(placeholder="Tell me about your dream trip", id="chat_input")
 
   @on(Input.Submitted)
   def send_message(self, event: Input.Submitted) -> None:

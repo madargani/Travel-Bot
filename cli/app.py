@@ -10,6 +10,7 @@ EXAMPLE_MARKDOWN = Path('cli/example_trip.md').read_text()
 
 class TravelBot(App):
   CSS_PATH = "styles/styles.tcss"
+  AUTO_FOCUS = "#chat_input"
 
   def compose(self) -> ComposeResult:
     with Horizontal():
