@@ -6,7 +6,8 @@ Your personal travel planner. This conversational agent will plan everything abo
 2. Install dependencies
 
 ## Usage
-`python cli/app.py`
+Start FastAPI server for development:
+- `fastapi dev backend/server.py`
 
 ## Group Members
 - Andre Dargani, mdargani@sfsu.edu, 922480985
