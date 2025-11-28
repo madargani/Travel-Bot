@@ -6,7 +6,10 @@ Your personal travel planner. This conversational agent will plan everything abo
 2. Install dependencies
 
 ## Usage
-Start FastAPI server for development:
+Start Next.js for development:
+- `npm run dev frontend`
+
+Start FastAPI for development:
 - `fastapi dev backend/server.py`
 
 ## Group Members
