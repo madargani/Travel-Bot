@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
+from agents.model_node import llm_call
+
 api = FastAPI()
 
-@api.get('/hello')
+
+@api.("/prompt")
 async def hello():
-    return "hello"
+    
