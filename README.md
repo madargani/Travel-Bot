@@ -6,7 +6,13 @@ Your personal travel planner. This conversational agent will plan everything abo
 2. Install dependencies
 
 ## Usage
-`python cli/app.py`
+Start frontend for development:
+- `cd frontend`
+- `npm run dev`
+
+Start backend for development:
+- `cd backend`
+- `fastapi dev server.py`
 
 ## Group Members
 - Andre Dargani, mdargani@sfsu.edu, 922480985
