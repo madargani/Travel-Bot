@@ -3,11 +3,16 @@ from langchain_openai import ChatOpenAI
 
 from agents.graph import create_agent
 from tools.flight_scraper import flight_search_tool
+from generic_scraper import search_restaurants, search_events, search_attractions
 
 load_dotenv()
 
 # Insert tools here
-tools = [flight_search_tool]
+tools = [flight_search_tool,
+         search_restaurants,
+         search_events,
+         search_attractions
+        ]
 
 model = ChatOpenAI(
     model="gpt-5-nano", temperature=0, timeout=None, max_retries=2, streaming=True
