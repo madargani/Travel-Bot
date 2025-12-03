@@ -8,7 +8,7 @@ export default function MessageList({ messages }: { messages: Message[] }) {
       {messages.map((msg, idx) => (
         <div
           key={idx}
-          className={`p-4 max-w-xs break-words whitespace-pre-wrap ${
+          className={`p-4 max-w-xs rounded-xl my-4 break-words whitespace-pre-wrap ${
             msg.user === "user"
               ? "bg-blue-500 text-white ml-auto"
               : "bg-gray-300 text-black"
