@@ -3,8 +3,7 @@ from typing import cast
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from langchain.messages import AIMessageChunk
-from langchain_core.messages.ai import AIMessage
+from langchain.messages import AIMessage
 
 from agents.agent import agent
 
@@ -24,7 +23,8 @@ api.add_middleware(
 
 async def response_generator(prompt: str):
     async for token, _ in agent.astream(
-        {"messages": [{"role": "user", "content": prompt}]}, stream_mode="messages"
+        {"messages": [{"role": "user", "content": prompt}]},  # pyright: ignore
+        stream_mode="messages",  # pyright: ignore
     ):
         yield str(cast(AIMessage, token).content)
 
