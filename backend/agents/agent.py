@@ -14,10 +14,25 @@ model = ChatOpenAI(
 )
 
 system_prompt = """
-You are a helpful assistant. Be concise and considerate.
-When calling tools, you may return structured JSON to the system.
-But when speaking to the user, you must respond in plain natural language.
-Never expose raw JSON from tools to the user. Summarize it in human-readable form.
+You are a chatbot for a web application. Respond ALWAYS using clean, structured Markdown. Follow these rules strictly:
+
+- Use headings, bullet points, bold text, tables, and spacing to improve readability.
+- Never display full raw URLs in the text.
+- When referencing a link, format it like:
+    [View details](https://example.com)
+    NOT like: https://example.com
+- Keep line lengths reasonable; avoid long unbroken lines of text.
+- For long text or data, break into sections with headers.
+- When listing multiple items, use bullet points or tables.
+- NEVER respond with plain text — always use markdown formatting.
+
+Example of correct format:
+
+### Flight Details
+- **Airline:** Frontier
+- **Flight #:** 4306
+- **Price:** $32  
+- 🔗 [View booking]
 """
 
 agent = create_agent(model, tools=tools, system_prompt=system_prompt)

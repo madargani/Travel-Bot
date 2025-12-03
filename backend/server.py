@@ -22,11 +22,12 @@ api.add_middleware(
 
 
 async def response_generator(prompt: str):
-    async for token, _ in agent.astream(
+    async for token, metadata in agent.astream(
         {"messages": [{"role": "user", "content": prompt}]},  # pyright: ignore
         stream_mode="messages",  # pyright: ignore
     ):
-        yield str(cast(AIMessage, token).content)
+        if cast(dict, metadata)["langgraph_node"] == "llm_call":
+            yield str(cast(AIMessage, token).content)
 
 
 @api.post("/prompt")

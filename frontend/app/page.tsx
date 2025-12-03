@@ -40,11 +40,15 @@ export default function Page() {
       if (done) break;
 
       const chunk = decoder.decode(value, { stream: true });
+      console.log(chunk);
 
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[responseIndex + 1].content += chunk;
-        return updated;
+        const lastMessage = prev[prev.length - 1];
+        const updatedLastMessage = {
+          ...lastMessage,
+          content: lastMessage.content + chunk,
+        };
+        return [...prev.slice(0, -1), updatedLastMessage];
       });
     }
   };
