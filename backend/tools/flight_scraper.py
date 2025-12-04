@@ -70,7 +70,7 @@ def build_booking_url(partial_link: str) -> str:
 
 
 #
-#Pydamic schemas for tools
+#Pydantic schemas for tools
 #
 
 class FlightSearchArgs(BaseModel):
