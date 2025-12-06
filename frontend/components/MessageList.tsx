@@ -1,6 +1,7 @@
 import { Message } from "../types/Message";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import ThinkingDots from "./ThinkingDots";
 
 export default function MessageList({ messages }: { messages: Message[] }) {
   return (
@@ -14,9 +15,13 @@ export default function MessageList({ messages }: { messages: Message[] }) {
               : "bg-gray-300 text-black"
           }`}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {msg.content}
-          </ReactMarkdown>
+          {msg.isThinking ? (
+            <ThinkingDots />
+          ) : (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {msg.content}
+            </ReactMarkdown>
+          )}
         </div>
       ))}
     </div>

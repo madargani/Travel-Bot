@@ -19,7 +19,7 @@ export default function Page() {
     setInput("");
 
     const responseIndex = messages.length;
-    setMessages((prev) => [...prev, { user: "assistant", content: "" }]);
+    setMessages((prev) => [...prev, { user: "assistant", content: "", isThinking: true }]);
 
     const response = await fetch(
       `http://localhost:8000/prompt?prompt=${encodeURI(input)}`,
@@ -47,6 +47,7 @@ export default function Page() {
         const updatedLastMessage = {
           ...lastMessage,
           content: lastMessage.content + chunk,
+          isThinking: false,
         };
         return [...prev.slice(0, -1), updatedLastMessage];
       });
