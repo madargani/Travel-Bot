@@ -60,6 +60,8 @@ class TestFastAPIServer:
         assert response.status_code == 200
         data = response.json()
         assert "response" in data
+        assert "updated_itinerary_progress" in data
+        assert "updated_message_history" in data
         assert len(data["response"]) > 0
 
     def test_chat_endpoint_empty_message(self):
@@ -71,6 +73,34 @@ class TestFastAPIServer:
         assert response.status_code == 200
         data = response.json()
         assert "response" in data
+        assert "updated_itinerary_progress" in data
+        assert "updated_message_history" in data
+
+    def test_chat_endpoint_with_history(self):
+        """Test chat endpoint with message history and progress."""
+        client = TestClient(app)
+        request_data = {
+            "message": "I want to change my flight choice",
+            "message_history": [
+                {"role": "user", "content": "Plan a trip to NYC"},
+                {"role": "assistant", "content": "I found some flight options"},
+            ],
+            "itinerary_progress": {
+                "stage": "flights",
+                "flights": {"origin": "LAX", "destination": "JFK"},
+            },
+            "session_id": "test_session_123",
+        }
+        response = client.post("/chat", json=request_data)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        assert "updated_itinerary_progress" in data
+        assert "updated_message_history" in data
+        assert (
+            len(data["updated_message_history"]) == 4
+        )  # 2 existing + 1 new user + 1 assistant response
 
     def test_chat_endpoint_invalid_request(self):
         """Test chat endpoint rejects invalid requests."""
@@ -91,6 +121,30 @@ class TestFastAPIServer:
         assert "text/event-stream" in response.headers["content-type"]
 
         # Should contain streaming data
+        assert "data:" in response.text
+
+    def test_streaming_endpoint_with_context(self):
+        """Test streaming endpoint with history and progress."""
+        client = TestClient(app)
+        request_data = {
+            "message": "Show me hotels in NYC",
+            "message_history": [
+                {"role": "user", "content": "Book flight to NYC"},
+                {"role": "assistant", "content": "Flight booked for LAX to JFK"},
+            ],
+            "itinerary_progress": {
+                "stage": "hotels",
+                "flights": {
+                    "origin": "LAX",
+                    "destination": "JFK",
+                    "departure_date": "2024-06-01",
+                },
+            },
+        }
+        response = client.post("/chat/stream", json=request_data)
+
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
         assert "data:" in response.text
 
     def test_streaming_endpoint_empty_message(self):

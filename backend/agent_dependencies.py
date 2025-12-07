@@ -2,7 +2,8 @@
 Travel Agent Dependencies - Configuration and API keys for Pydantic-AI agent.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 import os
 from dotenv import load_dotenv
 
@@ -27,8 +28,18 @@ class TravelDependencies:
     # Events API (Ticketmaster)
     ticketmaster_api_key: str
 
+    # Session management
+    session_id: str = ""
+    message_history: List[Dict[str, Any]] = field(default_factory=list)
+    itinerary_progress: Dict[str, Any] = field(default_factory=dict)
+
     @classmethod
-    def from_env(cls) -> "TravelDependencies":
+    def from_env(
+        cls,
+        session_id: str = "",
+        message_history: List[Dict[str, Any]] = None,
+        itinerary_progress: Dict[str, Any] = None,
+    ) -> "TravelDependencies":
         """Create dependencies from environment variables."""
         return cls(
             travelpayouts_token=os.getenv("TRAVELPAYOUTS_TOKEN", ""),
@@ -39,4 +50,7 @@ class TravelDependencies:
             ),
             yelp_api_key=os.getenv("YELP_API_KEY", ""),
             ticketmaster_api_key=os.getenv("TICKETMASTER_API_KEY", ""),
+            session_id=session_id,
+            message_history=message_history or [],
+            itinerary_progress=itinerary_progress or {},
         )

@@ -1,15 +1,24 @@
 "use client";
 
 import ChatUI from "../components/ChatUI";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-import { Message } from "../types/Message";
+import { Message, ItineraryProgress } from "../types/Message";
 
 export default function Page() {
   const [messages, setMessages] = useState<Message[]>([
     { user: "assistant", content: "Hello! How can I help you?" },
   ]);
   const [input, setInput] = useState<string>("");
+  const [sessionId, setSessionId] = useState<string>("");
+  const [itineraryProgress, setItineraryProgress] = useState<ItineraryProgress>({
+    stage: 'initial'
+  });
+
+  // Generate session ID on component mount
+  useEffect(() => {
+    setSessionId(crypto.randomUUID());
+  }, []);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -26,6 +35,19 @@ export default function Page() {
     ]);
 
     try {
+      // Format message history for backend API
+      const messageHistory = messages.map(msg => ({
+        role: msg.user,
+        content: msg.content
+      }));
+
+      console.log("Sending request with context:", {
+        message: currentInput,
+        message_history: messageHistory,
+        itinerary_progress: itineraryProgress,
+        session_id: sessionId
+      });
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(`${apiUrl}/chat/stream`, {
         method: "POST",
@@ -35,6 +57,9 @@ export default function Page() {
         body: JSON.stringify({
           message: currentInput,
           stream: true,
+          message_history: messageHistory,
+          itinerary_progress: itineraryProgress,
+          session_id: sessionId
         }),
       });
 
@@ -84,6 +109,20 @@ export default function Page() {
                     return [...prev.slice(0, -1), updatedLastMessage];
                   });
                 }
+              }
+
+              // Handle itinerary progress updates
+              if (data.itinerary_progress) {
+                console.log("Updating itinerary progress:", data.itinerary_progress);
+                setItineraryProgress(data.itinerary_progress);
+              }
+
+              // Log when streaming is done
+              if (data.done) {
+                console.log("Streaming completed. Final state:", {
+                  messagesCount: messages.length + 1,
+                  itineraryProgress: data.itinerary_progress || itineraryProgress
+                });
               }
             } catch (e) {
               console.error("Error parsing SSE data:", e, "Raw line:", line);
