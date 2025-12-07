@@ -1,22 +1,18 @@
-from dotenv import load_dotenv
-from langchain.tools import tool
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
-import os
 import requests
 import json
+from pydantic_ai import Agent, RunContext
+import sys
+import os
 
-# Load environment variables from .env
-load_dotenv()
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from agent_dependencies import TravelDependencies
 
-# Hotel API keys (Booking.com via RapidAPI) – separate from your flight tokens
-HOTELS_RAPIDAPI_KEY = os.getenv("HOTELS_RAPIDAPI_KEY")
-HOTELS_RAPIDAPI_HOST = os.getenv("HOTELS_RAPIDAPI_HOST", "booking-com18.p.rapidapi.com")
 
-AUTO_COMPLETE_ENDPOINT = f"https://{HOTELS_RAPIDAPI_HOST}/stays/auto-complete"
-SEARCH_ENDPOINT = f"https://{HOTELS_RAPIDAPI_HOST}/stays/search"
-
-def get_location_id(city: str) -> Optional[str]:
+def get_location_id(
+    city: str, hotels_rapidapi_key: str, hotels_rapidapi_host: str
+) -> Optional[str]:
     """
     Use Booking.com 'auto-complete' endpoint to resolve a city name to a locationId.
 
@@ -24,19 +20,24 @@ def get_location_id(city: str) -> Optional[str]:
     matching locations. We then pick the first match and use its 'locationId'
     field for the main hotel search endpoint.
     """
-    if not HOTELS_RAPIDAPI_KEY:
+    if not hotels_rapidapi_key:
         raise ValueError("HOTELS_RAPIDAPI_KEY environment variable is not set.")
 
     headers = {
-        "x-rapidapi-key": HOTELS_RAPIDAPI_KEY,
-        "x-rapidapi-host": HOTELS_RAPIDAPI_HOST,
+        "x-rapidapi-key": hotels_rapidapi_key,
+        "x-rapidapi-host": hotels_rapidapi_host,
     }
 
     params = {
         "text": city,
     }
 
-    resp = requests.get(AUTO_COMPLETE_ENDPOINT, headers=headers, params=params, timeout=30)
+    resp = requests.get(
+        f"https://{hotels_rapidapi_host}/stays/auto-complete",
+        headers=headers,
+        params=params,
+        timeout=30,
+    )
     resp.raise_for_status()
     data = resp.json()
 
@@ -58,6 +59,7 @@ def get_location_id(city: str) -> Optional[str]:
     # but for now we just return None so you can see/debug the structure.
     return None
 
+
 def search_hotels(
     location_id: str,
     checkin_date: str,
@@ -67,6 +69,8 @@ def search_hotels(
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     currency: str = "USD",
+    hotels_rapidapi_key: str = "",
+    hotels_rapidapi_host: str = "",
 ) -> Dict[str, Any]:
     """
     Call Booking.com stays/search endpoint with a locationId and date range.
@@ -74,12 +78,12 @@ def search_hotels(
     This returns raw JSON from the API, which can contain hotel listings,
     prices, ratings, etc.
     """
-    if not HOTELS_RAPIDAPI_KEY:
+    if not hotels_rapidapi_key:
         raise ValueError("HOTELS_RAPIDAPI_KEY environment variable is not set.")
 
     headers = {
-        "x-rapidapi-key": HOTELS_RAPIDAPI_KEY,
-        "x-rapidapi-host": HOTELS_RAPIDAPI_HOST,
+        "x-rapidapi-key": hotels_rapidapi_key,
+        "x-rapidapi-host": hotels_rapidapi_host,
     }
 
     params = {
@@ -99,7 +103,12 @@ def search_hotels(
     if max_price is not None:
         params["maxPrice"] = str(max_price)
 
-    resp = requests.get(SEARCH_ENDPOINT, headers=headers, params=params, timeout=30)
+    resp = requests.get(
+        f"https://{hotels_rapidapi_host}/stays/search",
+        headers=headers,
+        params=params,
+        timeout=30,
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -117,12 +126,7 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
     # The hotels might live under data.hotels, data.stays, or similar.
     # Here we try a few likely places:
     data = raw.get("data") or raw
-    results = (
-        data.get("stays") or
-        data.get("hotels") or
-        data.get("results") or
-        []
-    )
+    results = data.get("stays") or data.get("hotels") or data.get("results") or []
 
     for h in results[:limit]:
         name = h.get("name") or h.get("hotelName")
@@ -132,7 +136,11 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
         price_info = h.get("price") or h.get("priceBreakdown") or {}
         # Try common patterns for price fields
         if isinstance(price_info, dict):
-            price = price_info.get("value") or price_info.get("price") or price_info.get("grossPrice")
+            price = (
+                price_info.get("value")
+                or price_info.get("price")
+                or price_info.get("grossPrice")
+            )
             currency = price_info.get("currency") or price_info.get("currencyCode")
 
         rating = h.get("rating") or h.get("reviewScore")
@@ -170,17 +178,36 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
 
 class HotelSearchArgs(BaseModel):
     city: str = Field(description="City name to search hotels in, e.g., 'New York'")
-    checkin_date: str = Field(description="Check-in date in 'YYYY-MM-DD', e.g., '2025-12-05'")
-    checkout_date: str = Field(description="Check-out date in 'YYYY-MM-DD', e.g., '2025-12-06'")
+    checkin_date: str = Field(
+        description="Check-in date in 'YYYY-MM-DD', e.g., '2025-12-05'"
+    )
+    checkout_date: str = Field(
+        description="Check-out date in 'YYYY-MM-DD', e.g., '2025-12-06'"
+    )
     adults: Optional[int] = Field(default=2, description="Number of adults, e.g., 2")
     rooms: Optional[int] = Field(default=1, description="Number of rooms, e.g., 1")
-    min_price: Optional[int] = Field(default=None, description="Optional minimum price filter")
-    max_price: Optional[int] = Field(default=None, description="Optional maximum price filter")
-    currency: Optional[str] = Field(default="USD", description="Currency code, e.g., 'USD'")
+    min_price: Optional[int] = Field(
+        default=None, description="Optional minimum price filter"
+    )
+    max_price: Optional[int] = Field(
+        default=None, description="Optional maximum price filter"
+    )
+    currency: Optional[str] = Field(
+        default="USD", description="Currency code, e.g., 'USD'"
+    )
 
 
-@tool("hotel_search_tool", args_schema=HotelSearchArgs, return_direct=True)
-def hotel_search_tool(
+# Create the hotel search agent
+hotel_agent = Agent(
+    "openai:gpt-4o",
+    deps_type=TravelDependencies,
+    system_prompt="You are a hotel search assistant. Use the available tools to search for hotels.",
+)
+
+
+@hotel_agent.tool
+async def hotel_search_tool(
+    ctx: RunContext[TravelDependencies],
     city: str,
     checkin_date: str,
     checkout_date: str,
@@ -196,7 +223,9 @@ def hotel_search_tool(
 
     This is analogous to your flight_search_tool but for stays/hotels.
     """
-    location_id = get_location_id(city)
+    location_id = get_location_id(
+        city, ctx.deps.hotels_rapidapi_key, ctx.deps.hotels_rapidapi_host
+    )
     if not location_id:
         return f"No locationId found for city: {city}. Try a different city name."
 
@@ -209,6 +238,8 @@ def hotel_search_tool(
         min_price=min_price,
         max_price=max_price,
         currency=currency,
+        hotels_rapidapi_key=ctx.deps.hotels_rapidapi_key,
+        hotels_rapidapi_host=ctx.deps.hotels_rapidapi_host,
     )
 
     hotels = summarize_hotels(raw, limit=5)
@@ -220,13 +251,21 @@ def hotel_search_tool(
 
 
 if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    deps = TravelDependencies.from_env()
     print("Testing Booking.com hotel search via RapidAPI…")
 
     test_city = "New York"
     checkin = "2025-12-05"
     checkout = "2025-12-06"
 
-    loc_id = get_location_id(test_city)
+    loc_id = get_location_id(
+        test_city, deps.hotels_rapidapi_key, deps.hotels_rapidapi_host
+    )
     print("LocationId for", test_city, ":", loc_id)
 
     if loc_id:
@@ -239,6 +278,8 @@ if __name__ == "__main__":
             min_price=0,
             max_price=300,
             currency="USD",
+            hotels_rapidapi_key=deps.hotels_rapidapi_key,
+            hotels_rapidapi_host=deps.hotels_rapidapi_host,
         )
 
         hotels = summarize_hotels(raw, limit=5)
@@ -246,5 +287,3 @@ if __name__ == "__main__":
         print(json.dumps(hotels, indent=2))
     else:
         print("Could not resolve city to a locationId.")
-
-

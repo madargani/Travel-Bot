@@ -22,7 +22,8 @@
 - Type hints required for all function signatures
 - Use Pydantic BaseModel for data validation
 - Environment variables via `python-dotenv`
-- LangChain tools with proper schemas and descriptions
+- Pydantic-AI agents with `@agent.tool` decorators
+- Use `TravelDependencies.from_env()` for API key management
 
 ### TypeScript Frontend
 - Next.js with TypeScript (strict mode disabled)

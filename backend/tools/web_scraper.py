@@ -13,33 +13,22 @@ It supports filtering using:
 - budget range
 """
 
-import os
-import requests
-import datetime
 import json
 from typing import List, Optional, Dict
-from langchain.tools import tool
+from pydantic_ai import Agent, RunContext
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from agent_dependencies import TravelDependencies
+import requests
 
 
-
-
-YELP_API_KEY = os.getenv("YELP_API_KEY", "")
-TICKETMASTER_API_KEY = os.getenv("TICKETMASTER_API_KEY", "")
-
-
-
-# RESTAURANTS SCRAPER (YELP)
-
-
-def _query_yelp(city: str, limit: int = 10) -> List[Dict]:
+def _query_yelp(city: str, limit: int = 10, yelp_api_key: str = "") -> List[Dict]:
     """Internal helper — hit Yelp API."""
     url = "https://api.yelp.com/v3/businesses/search"
-    headers = {"Authorization": f"Bearer {YELP_API_KEY}"}
-    params = {
-        "location": city,
-        "limit": limit,
-        "sort_by": "rating"
-    }
+    headers = {"Authorization": f"Bearer {yelp_api_key}"}
+    params = {"location": city, "limit": limit, "sort_by": "rating"}
 
     res = requests.get(url, headers=headers, params=params)
 
@@ -50,22 +39,93 @@ def _query_yelp(city: str, limit: int = 10) -> List[Dict]:
     clean_output = []
 
     for r in data:
-        clean_output.append({
-            "name": r.get("name"),
-            "price": r.get("price", "?"),
-            "rating": r.get("rating"),
-            "address": " ".join(r.get("location", {}).get("display_address", [])),
-            "categories": [c["title"] for c in r.get("categories", [])],
-            "image": r.get("image_url"),
-            "url": r.get("url"),
-        })
+        clean_output.append(
+            {
+                "name": r.get("name"),
+                "price": r.get("price", "?"),
+                "rating": r.get("rating"),
+                "address": " ".join(r.get("location", {}).get("display_address", [])),
+                "categories": [c["title"] for c in r.get("categories", [])],
+                "image": r.get("image_url"),
+                "url": r.get("url"),
+            }
+        )
 
     return clean_output
 
 
-# TOOL WRAPPER 
-@tool
-def search_restaurants(city: str, limit: int = 10) -> str:
+def _query_ticketmaster(
+    city: str,
+    start_date: str,
+    end_date: str,
+    limit: int = 10,
+    ticketmaster_api_key: str = "",
+):
+    """
+    Internal helper — Ticketmaster Discovery search.
+    Date format MUST be ISO timestamp: YYYY-MM-DDTHH:MM:SSZ
+    """
+
+    url = "https://app.ticketmaster.com/discovery/v2/events.json"
+    params = {
+        "city": city,
+        "apikey": ticketmaster_api_key,
+        "size": limit,
+        "startDateTime": f"{start_date}T00:00:00Z",
+        "endDateTime": f"{end_date}T23:59:59Z",
+    }
+
+    res = requests.get(url, params=params)
+    if res.status_code != 200:
+        return []
+
+    events = res.json().get("_embedded", {}).get("events", [])
+
+    clean = []
+    for e in events:
+        clean.append(
+            {
+                "name": e.get("name"),
+                "date": e.get("dates", {}).get("start", {}).get("localDate"),
+                "venue": e.get("_embedded", {}).get("venues", [{}])[0].get("name"),
+                "url": e.get("url"),
+                "classification": [c.get("name") for c in e.get("classifications", [])],
+            }
+        )
+    return clean
+
+
+# BAREBONES attraction fallback — no API required
+#
+
+STATIC_ATTRACTIONS = {
+    "paris": [
+        {"name": "Louvre Museum", "price": 17, "indoor": True},
+        {"name": "Eiffel Tower", "price": 25, "indoor": False},
+        {"name": "Seine River Cruise", "price": 15, "indoor": False},
+    ],
+    "new york": [
+        {"name": "MOMA", "price": 25, "indoor": True},
+        {"name": "Central Park Bike", "price": 10, "indoor": False},
+        {"name": "Empire State", "price": 42, "indoor": True},
+    ],
+}
+
+
+# Create the web scraper agent
+web_agent = Agent(
+    "openai:gpt-4o",
+    deps_type=TravelDependencies,
+    system_prompt="You are a travel activities assistant. Use the available tools to search for restaurants, events, and attractions.",
+)
+
+
+@web_agent.tool
+async def search_restaurants(
+    ctx: RunContext[TravelDependencies],
+    city: str,
+    limit: int = 10,
+) -> str:
     """
     Find restaurants for a given city (powered by Yelp).
 
@@ -83,59 +143,17 @@ def search_restaurants(city: str, limit: int = 10) -> str:
         - image
         - url
     """
-    data = _query_yelp(city, limit)
+    data = _query_yelp(city, limit, ctx.deps.yelp_api_key)
     return json.dumps(data)
-    # AGENT READS THIS JSON AS CONTEXT
-    # DO NOT RETURN LIST OR DICT — STRING ONLY
-    # LangChain agents think in text.
 
 
-# 
-#  EVENTS SCRAPER (TICKETMASTER)
-
-
-def _query_ticketmaster(city: str, start_date: str, end_date: str, limit: int = 10):
-    """
-    Internal helper — Ticketmaster Discovery search.
-    Date format MUST be ISO timestamp: YYYY-MM-DDTHH:MM:SSZ
-    """
-
-    url = "https://app.ticketmaster.com/discovery/v2/events.json"
-    params = {
-        "city": city,
-        "apikey": TICKETMASTER_API_KEY,
-        "size": limit,
-        "startDateTime": f"{start_date}T00:00:00Z",
-        "endDateTime": f"{end_date}T23:59:59Z",
-    }
-
-    res = requests.get(url, params=params)
-    if res.status_code != 200:
-        return []
-
-    events = res.json().get("_embedded", {}).get("events", [])
-
-    clean = []
-    for e in events:
-        clean.append({
-            "name": e.get("name"),
-            "date": e.get("dates", {}).get("start", {}).get("localDate"),
-            "venue": e.get("_embedded", {}).get("venues", [{}])[0].get("name"),
-            "url": e.get("url"),
-            "classification": [
-                c.get("name") for c in e.get("classifications", [])
-            ]
-        })
-    return clean
-
-
-# TOOL WRAPPER
-@tool
-def search_events(
+@web_agent.tool
+async def search_events(
+    ctx: RunContext[TravelDependencies],
     city: str,
     user_start_date: str,
     user_end_date: str,
-    limit: int = 8
+    limit: int = 8,
 ) -> str:
     """
     Search live events for travel itinerary (Ticketmaster).
@@ -154,30 +172,17 @@ def search_events(
         - url
         - classification
     """
-    raw = _query_ticketmaster(city, user_start_date, user_end_date, limit)
+    raw = _query_ticketmaster(
+        city, user_start_date, user_end_date, limit, ctx.deps.ticketmaster_api_key
+    )
     return json.dumps(raw)
 
 
-
-# BAREBONES attraction fallback — no API required
-# 
-
-STATIC_ATTRACTIONS = {
-    "paris": [
-        {"name": "Louvre Museum", "price": 17, "indoor": True},
-        {"name": "Eiffel Tower", "price": 25, "indoor": False},
-        {"name": "Seine River Cruise", "price": 15, "indoor": False}
-    ],
-    "new york": [
-        {"name": "MOMA", "price": 25, "indoor": True},
-        {"name": "Central Park Bike", "price": 10, "indoor": False},
-        {"name": "Empire State", "price": 42, "indoor": True}
-    ]
-}
-
-
-@tool
-def search_attractions(city: str) -> str:
+@web_agent.tool
+async def search_attractions(
+    ctx: RunContext[TravelDependencies],
+    city: str,
+) -> str:
     """
     Return a simple curated set of attractions.
     Backup when APIs fail or user needs generic suggestions.
