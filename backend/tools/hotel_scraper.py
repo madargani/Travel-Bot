@@ -1,13 +1,42 @@
-from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
-import requests
 import json
-from pydantic_ai import Agent, RunContext
-import sys
 import os
+import sys
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+import requests
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent, RunContext
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_dependencies import TravelDependencies
+
+
+def validate_dates(checkin_date: str, checkout_date: str) -> bool:
+    """
+    Validate that check-in and check-out dates are in the future and check-out is after check-in.
+    Returns True if valid, raises ValueError if invalid.
+    """
+    try:
+        checkin = datetime.strptime(checkin_date, "%Y-%m-%d").date()
+        checkout = datetime.strptime(checkout_date, "%Y-%m-%d").date()
+        today = date.today()
+
+        if checkin < today:
+            raise ValueError(
+                f"Check-in date {checkin_date} is in the past. Today is {today}."
+            )
+
+        if checkout <= checkin:
+            raise ValueError(
+                f"Check-out date {checkout_date} must be after check-in date {checkin_date}."
+            )
+
+        return True
+    except ValueError as e:
+        if "time data" in str(e):
+            raise ValueError(f"Invalid date format. Use YYYY-MM-DD format. Error: {e}")
+        raise
 
 
 def get_location_id(
@@ -29,17 +58,24 @@ def get_location_id(
     }
 
     params = {
-        "text": city,
+        "query": city,
     }
 
-    resp = requests.get(
-        f"https://{hotels_rapidapi_host}/stays/auto-complete",
-        headers=headers,
-        params=params,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.get(
+            f"https://{hotels_rapidapi_host}/stays/auto-complete",
+            headers=headers,
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed for auto-complete: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            print(f"Response status: {e.response.status_code}")
+            print(f"Response text: {e.response.text}")
+        return None
 
     # The exact response shape can vary; this is a reasonable guess for Booking.com autocomplete.
     # Adjust if needed after printing data once.
@@ -50,13 +86,17 @@ def get_location_id(
     # We assume the first suggestion is the best match
     first = suggestions[0]
 
-    # Some APIs use 'locationId' directly on the suggestion
-    location_id = first.get("locationId")
-    if location_id:
-        return location_id
+    # Use the encoded 'id' field for the search API
+    encoded_id = first.get("id")
+    if encoded_id:
+        return str(encoded_id)
 
-    # If there's no 'locationId', you may need to construct it from dest_id & dest_type,
-    # but for now we just return None so you can see/debug the structure.
+    # Fallback to dest_id if no encoded id
+    dest_id = first.get("dest_id")
+    if dest_id:
+        return str(dest_id)
+
+    # If there's no location ID, return None
     return None
 
 
@@ -103,14 +143,21 @@ def search_hotels(
     if max_price is not None:
         params["maxPrice"] = str(max_price)
 
-    resp = requests.get(
-        f"https://{hotels_rapidapi_host}/stays/search",
-        headers=headers,
-        params=params,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        resp = requests.get(
+            f"https://{hotels_rapidapi_host}/stays/search",
+            headers=headers,
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed for hotel search: {e}")
+        if hasattr(e, "response") and e.response is not None:
+            print(f"Response status: {e.response.status_code}")
+            print(f"Response text: {e.response.text}")
+        raise
 
 
 def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
@@ -126,7 +173,12 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
     # The hotels might live under data.hotels, data.stays, or similar.
     # Here we try a few likely places:
     data = raw.get("data") or raw
-    results = data.get("stays") or data.get("hotels") or data.get("results") or []
+
+    # Handle case where data is already a list
+    if isinstance(data, list):
+        results = data
+    else:
+        results = data.get("stays") or data.get("hotels") or data.get("results") or []
 
     for h in results[:limit]:
         name = h.get("name") or h.get("hotelName")
@@ -140,8 +192,12 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
                 price_info.get("value")
                 or price_info.get("price")
                 or price_info.get("grossPrice")
+                or price_info.get("amountRounded")
             )
             currency = price_info.get("currency") or price_info.get("currencyCode")
+            # Handle case where price is a dict with amount
+            if isinstance(price, dict):
+                price = price.get("value") or price.get("amount")
 
         rating = h.get("rating") or h.get("reviewScore")
         address = h.get("address") or h.get("location") or {}
@@ -179,10 +235,10 @@ def summarize_hotels(raw: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]
 class HotelSearchArgs(BaseModel):
     city: str = Field(description="City name to search hotels in, e.g., 'New York'")
     checkin_date: str = Field(
-        description="Check-in date in 'YYYY-MM-DD', e.g., '2025-12-05'"
+        description="Check-in date in 'YYYY-MM-DD', e.g., '2025-12-10'"
     )
     checkout_date: str = Field(
-        description="Check-out date in 'YYYY-MM-DD', e.g., '2025-12-06'"
+        description="Check-out date in 'YYYY-MM-DD', e.g., '2025-12-15'"
     )
     adults: Optional[int] = Field(default=2, description="Number of adults, e.g., 2")
     rooms: Optional[int] = Field(default=1, description="Number of rooms, e.g., 1")
@@ -223,6 +279,12 @@ async def hotel_search_tool(
 
     This is analogous to your flight_search_tool but for stays/hotels.
     """
+    # Validate dates before making API calls
+    try:
+        validate_dates(checkin_date, checkout_date)
+    except ValueError as e:
+        return f"Date validation error: {e}"
+
     location_id = get_location_id(
         city, ctx.deps.hotels_rapidapi_key, ctx.deps.hotels_rapidapi_host
     )
@@ -252,6 +314,7 @@ async def hotel_search_tool(
 
 if __name__ == "__main__":
     import os
+
     from dotenv import load_dotenv
 
     load_dotenv()
@@ -259,9 +322,9 @@ if __name__ == "__main__":
     deps = TravelDependencies.from_env()
     print("Testing Booking.com hotel search via RapidAPI…")
 
-    test_city = "New York"
-    checkin = "2025-12-05"
-    checkout = "2025-12-06"
+    test_city = "San Francisco"
+    checkin = "2025-12-10"
+    checkout = "2025-12-15"
 
     loc_id = get_location_id(
         test_city, deps.hotels_rapidapi_key, deps.hotels_rapidapi_host
