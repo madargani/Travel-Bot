@@ -9,10 +9,12 @@ dependencies = [
     "pydantic-ai>=0.0.14",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
+    "uvicorn[standard]>=0.30.0",
 ]
 
 [dependency-groups]
 dev = [
     "grandalf>=0.8",
     "pytest>=9.0.1",
+    "pytest-asyncio>=0.24.0",
 ]

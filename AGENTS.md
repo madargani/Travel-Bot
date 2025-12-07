@@ -3,10 +3,12 @@
 ## Commands
 
 ### Backend (Python/FastAPI)
-- **Start dev server**: `cd backend && fastapi dev server.py`
-- **Run tests**: `cd backend && pytest`
-- **Run single test**: `cd backend && pytest tests/test_agent.py::test_invoke`
+- **Start dev server**: `cd backend && uv run python server.py`
+- **Run server tests**: `cd backend && uv run python test_server.py`
+- **Run agent tests**: `cd backend && uv run python test_travel_agent.py`
 - **Install dependencies**: `cd backend && uv sync`
+- **API docs**: Visit http://localhost:8000/docs
+- **Health check**: Visit http://localhost:8000/health
 
 ### Frontend (Next.js/TypeScript)
 - **Start dev server**: `cd frontend && npm run dev`
