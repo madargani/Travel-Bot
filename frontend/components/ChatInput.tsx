@@ -1,4 +1,12 @@
-export default function ChatInput({ input, setInput, sendMessage }) {
+import { KeyboardEvent } from 'react';
+
+interface ChatInputProps {
+  input: string;
+  setInput: (value: string) => void;
+  sendMessage: (e?: KeyboardEvent<HTMLInputElement>) => void;
+}
+
+export default function ChatInput({ input, setInput, sendMessage }: ChatInputProps) {
   return (
     <div className="flex items-stretch">
       <input
@@ -10,7 +18,7 @@ export default function ChatInput({ input, setInput, sendMessage }) {
       />
       <button
         className="bg-blue-500 text-white px-4 py-4"
-        onClick={sendMessage}
+        onClick={() => sendMessage()}
       >
         Send
       </button>

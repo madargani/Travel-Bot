@@ -14,39 +14,108 @@ export default function Page() {
   const sendMessage = async () => {
     if (!input.trim()) return;
 
-    const newMessage: Message = { user: "user", content: input };
-    setMessages([...messages, newMessage]);
+    const userMessage: Message = { user: "user", content: input };
+    setMessages([...messages, userMessage]);
+    const currentInput = input;
     setInput("");
 
-    const responseIndex = messages.length;
-    setMessages((prev) => [...prev, { user: "assistant", content: "", isThinking: true }]);
+    // Add assistant message with thinking state
+    setMessages((prev) => [
+      ...prev,
+      { user: "assistant", content: "", isThinking: true },
+    ]);
 
-    const response = await fetch(
-      `http://localhost:8000/prompt?prompt=${encodeURI(input)}`,
-      {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/chat/stream`, {
         method: "POST",
         headers: {
-          accept: "application/json",
+          "Content-Type": "application/json",
         },
-        body: "",
-      },
-    );
+        body: JSON.stringify({
+          message: currentInput,
+          stream: true,
+        }),
+      });
 
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = ""; // Track the full content to avoid duplication
 
-      const chunk = decoder.decode(value, { stream: true });
-      console.log(chunk);
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        console.log("Raw chunk received:", chunk);
+
+        // Process each SSE message directly (no buffering needed since Pydantic-AI sends complete messages)
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const jsonStr = line.substring(6); // Remove 'data: ' prefix
+              if (jsonStr.trim() === "") continue;
+
+              const data = JSON.parse(jsonStr);
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+
+              if (data.content) {
+                // Only append new content (avoid duplication from cumulative chunks)
+                const newContent = data.content.substring(fullContent.length);
+                if (newContent) {
+                  fullContent = data.content;
+
+                  setMessages((prev) => {
+                    const lastMessage = prev[prev.length - 1];
+                    const updatedLastMessage = {
+                      ...lastMessage,
+                      content: fullContent,
+                      isThinking: false,
+                    };
+                    return [...prev.slice(0, -1), updatedLastMessage];
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e, "Raw line:", line);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+
+      let errorMessage = "Sorry, I encountered an error. Please try again.";
+
+      // Provide more specific error messages for common issues
+      if (error instanceof Error) {
+        if (error.message.includes("Failed to fetch")) {
+          errorMessage =
+            "Unable to connect to the server. Please check if the backend is running.";
+        } else if (error.message.includes("HTTP error! status: 500")) {
+          errorMessage = "Server error occurred. Please try again in a moment.";
+        } else if (error.message.includes("JSON.parse")) {
+          errorMessage = "Received invalid data format from server.";
+        } else if (error.message.includes("NetworkError")) {
+          errorMessage =
+            "Network connection lost. Please check your internet connection.";
+        }
+      }
 
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
         const updatedLastMessage = {
           ...lastMessage,
-          content: lastMessage.content + chunk,
+          content: errorMessage,
           isThinking: false,
         };
         return [...prev.slice(0, -1), updatedLastMessage];
