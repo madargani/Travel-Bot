@@ -1,11 +1,13 @@
-from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
-import requests
-from pydantic_ai import Agent, RunContext
-import sys
 import os
+import sys
+from typing import Any, Dict, List, Optional
+
+import requests
+from pydantic import BaseModel, Field
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from pydantic_ai import RunContext
+
 from agent_dependencies import TravelDependencies
 
 AVIASALES_BASE = "https://www.aviasales.com"
@@ -94,15 +96,9 @@ class BookingURLArgs(BaseModel):
     )
 
 
-# Create the flight search agent
-flight_agent = Agent(
-    "openai:gpt-4o",
-    deps_type=TravelDependencies,
-    system_prompt="You are a flight search assistant. Use the available tools to search for flights and build booking URLs.",
-)
+# Standalone tool functions for direct integration with travel_agent
 
 
-@flight_agent.tool
 async def flight_search_tool(
     ctx: RunContext[TravelDependencies],
     origin: str,
@@ -124,7 +120,6 @@ async def flight_search_tool(
     return str(flights)
 
 
-@flight_agent.tool
 async def build_booking_url_tool(
     ctx: RunContext[TravelDependencies],
     partial_link: str,
@@ -135,6 +130,7 @@ async def build_booking_url_tool(
 
 if __name__ == "__main__":
     import os
+
     from dotenv import load_dotenv
 
     load_dotenv()

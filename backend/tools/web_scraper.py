@@ -15,7 +15,7 @@ It supports filtering using:
 
 import json
 from typing import List, Optional, Dict
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import RunContext
 import sys
 import os
 
@@ -112,15 +112,9 @@ STATIC_ATTRACTIONS = {
 }
 
 
-# Create the web scraper agent
-web_agent = Agent(
-    "openai:gpt-4o",
-    deps_type=TravelDependencies,
-    system_prompt="You are a travel activities assistant. Use the available tools to search for restaurants, events, and attractions.",
-)
+# Standalone tool functions for direct integration with travel_agent
 
 
-@web_agent.tool
 async def search_restaurants(
     ctx: RunContext[TravelDependencies],
     city: str,
@@ -147,7 +141,6 @@ async def search_restaurants(
     return json.dumps(data)
 
 
-@web_agent.tool
 async def search_events(
     ctx: RunContext[TravelDependencies],
     city: str,
@@ -178,7 +171,6 @@ async def search_events(
     return json.dumps(raw)
 
 
-@web_agent.tool
 async def search_attractions(
     ctx: RunContext[TravelDependencies],
     city: str,

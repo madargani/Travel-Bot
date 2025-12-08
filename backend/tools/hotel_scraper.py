@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import RunContext
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_dependencies import TravelDependencies
@@ -253,15 +253,9 @@ class HotelSearchArgs(BaseModel):
     )
 
 
-# Create the hotel search agent
-hotel_agent = Agent(
-    "openai:gpt-4o",
-    deps_type=TravelDependencies,
-    system_prompt="You are a hotel search assistant. Use the available tools to search for hotels.",
-)
+# Standalone tool function for direct integration with travel_agent
 
 
-@hotel_agent.tool
 async def hotel_search_tool(
     ctx: RunContext[TravelDependencies],
     city: str,
