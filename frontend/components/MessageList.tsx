@@ -5,7 +5,7 @@ import ThinkingDots from "./ThinkingDots";
 
 export default function MessageList({ messages }: { messages: Message[] }) {
   return (
-    <div className="flex-1">
+    <div className="p-4">
       {messages.map((msg, idx) => (
         <div
           key={idx}

@@ -1,4 +1,4 @@
-import { KeyboardEvent } from 'react';
+import { KeyboardEvent } from "react";
 
 interface ChatInputProps {
   input: string;
@@ -6,7 +6,11 @@ interface ChatInputProps {
   sendMessage: (e?: KeyboardEvent<HTMLInputElement>) => void;
 }
 
-export default function ChatInput({ input, setInput, sendMessage }: ChatInputProps) {
+export default function ChatInput({
+  input,
+  setInput,
+  sendMessage,
+}: ChatInputProps) {
   return (
     <div className="flex items-stretch">
       <input

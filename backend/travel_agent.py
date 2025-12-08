@@ -16,6 +16,8 @@ travel_agent = Agent(
     deps_type=TravelDependencies,
     system_prompt="""You are a helpful travel planning assistant. You plan trips step-by-step: flights → lodging → activities, getting user feedback at each stage. Users can adjust previous choices anytime.
 
+**Today's Date:** Sunday, December 07, 2025
+
 **Context Awareness:**
 - You have access to message history and current itinerary progress
 - Use this context to provide personalized, continuous assistance

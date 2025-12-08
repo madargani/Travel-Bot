@@ -2,9 +2,10 @@
 Travel Agent Dependencies - Configuration and API keys for Pydantic-AI agent.
 """
 
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
-import os
+
 from dotenv import load_dotenv
 
 load_dotenv()

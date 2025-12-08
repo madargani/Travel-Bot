@@ -1,6 +1,7 @@
 "use client";
 
 import ChatUI from "../components/ChatUI";
+import ItineraryDisplay from "../components/ItineraryDisplay";
 import { useState, useEffect } from "react";
 
 import { Message, ItineraryProgress } from "../types/Message";
@@ -11,9 +12,11 @@ export default function Page() {
   ]);
   const [input, setInput] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
-  const [itineraryProgress, setItineraryProgress] = useState<ItineraryProgress>({
-    stage: 'initial'
-  });
+  const [itineraryProgress, setItineraryProgress] = useState<ItineraryProgress>(
+    {
+      stage: "initial",
+    },
+  );
 
   // Generate session ID on component mount
   useEffect(() => {
@@ -36,16 +39,16 @@ export default function Page() {
 
     try {
       // Format message history for backend API
-      const messageHistory = messages.map(msg => ({
+      const messageHistory = messages.map((msg) => ({
         role: msg.user,
-        content: msg.content
+        content: msg.content,
       }));
 
       console.log("Sending request with context:", {
         message: currentInput,
         message_history: messageHistory,
         itinerary_progress: itineraryProgress,
-        session_id: sessionId
+        session_id: sessionId,
       });
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -59,7 +62,7 @@ export default function Page() {
           stream: true,
           message_history: messageHistory,
           itinerary_progress: itineraryProgress,
-          session_id: sessionId
+          session_id: sessionId,
         }),
       });
 
@@ -76,7 +79,6 @@ export default function Page() {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        console.log("Raw chunk received:", chunk);
 
         // Process each SSE message directly (no buffering needed since Pydantic-AI sends complete messages)
         const lines = chunk.split("\n");
@@ -113,7 +115,10 @@ export default function Page() {
 
               // Handle itinerary progress updates
               if (data.itinerary_progress) {
-                console.log("Updating itinerary progress:", data.itinerary_progress);
+                console.log(
+                  "Updating itinerary progress:",
+                  data.itinerary_progress,
+                );
                 setItineraryProgress(data.itinerary_progress);
               }
 
@@ -121,7 +126,8 @@ export default function Page() {
               if (data.done) {
                 console.log("Streaming completed. Final state:", {
                   messagesCount: messages.length + 1,
-                  itineraryProgress: data.itinerary_progress || itineraryProgress
+                  itineraryProgress:
+                    data.itinerary_progress || itineraryProgress,
                 });
               }
             } catch (e) {
@@ -163,14 +169,14 @@ export default function Page() {
   };
 
   return (
-    <div className="grid grid-cols-2 h-screen">
+    <div className="grid grid-cols-2 h-screen overflow-hidden">
       <ChatUI
         messages={messages}
         input={input}
         setInput={setInput}
         sendMessage={sendMessage}
       />
-      <div className="bg-blue-500"></div>
+      <ItineraryDisplay itineraryProgress={itineraryProgress} />
     </div>
   );
 }
